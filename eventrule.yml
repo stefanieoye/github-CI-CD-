@@ -1,0 +1,16 @@
+CloudWatchEventRule:
+Type: "AWS::Events::Rule"
+Properties:
+Name: !Sub "${LambdaFunctionName}-schedule"
+ScheduleExpression: "cron(0 2 * * ? *)"
+State: "ENABLED"
+Targets:
+- Id: "TargetFunction"
+  Arn: !GetAtt LambdaFunction.Arn
+  CloudWatchEventPermission:
+   Type: "AWS::Lambda::Permission"
+   Properties:
+Action: "lambda:InvokeFunction"
+FunctionName: !Ref LambdaFunction
+Principal: "events.amazonaws.com"
+SourceArn: !GetAtt CloudWatchEventRule.Arn

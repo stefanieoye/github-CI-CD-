@@ -1,0 +1,55 @@
+Parameters:
+ LambdaFunctionName:
+    Type: String
+    Default: "reproject-lambda"
+    Description: "The name of the Lambda function to create."
+LambdaFunction:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      FunctionName: !Ref LambdaFunctionName
+      Runtime: "nodejs14.x"
+      Handler: "index.handler"
+      Code:
+        ZipFile: |
+          const AWS = require('aws-sdk');
+          const docClient = new AWS.DynamoDB.DocumentClient();
+          const s3 = new AWS.S3();
+          exports.handler = async (event, context) => {
+            const tableName = process.env.TABLE_NAME;
+            const bucketName = process.env.BUCKET_NAME;
+            const now = new Date();
+            const backupKey = `backup-${now.toISOString()}.json`;
+            const exportParams = {
+              TableName: tableName
+            };
+            const exportData = await docClient.scan(exportParams).promise();
+            const exportJson = JSON.stringify(exportData.Items);
+            const s3Params = {
+              Bucket: bucketName,
+              Key: backupKey,
+              Body: exportJson
+            };
+            const
+           s3.putObject(s3Params, (err, data) => {
+          if (err) {
+            console.log(err);
+            context.fail(err);
+          } else {
+            console.log(data);
+            context.succeed(`Exported ${exportData.Count} items to S3 bucket ${bucketName}`);
+          }
+                        });
+                                 };
+        Environment:
+    Variables:
+      TABLE_NAME: !Ref DynamoDBTable
+      BUCKET_NAME: !Ref S3Bucket
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 60        
+    LambdaPermission:
+Type: "AWS::Lambda::Permission"
+Properties:
+FunctionName: !Ref LambdaFunction
+Action: "lambda:InvokeFunction"
+Principal: "events.amazonaws.com"
+SourceArn: !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/${LambdaFunctionName}-schedule" 
